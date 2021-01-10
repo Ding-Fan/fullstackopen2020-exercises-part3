@@ -59,18 +59,17 @@ let persons = [
 // middlewares
 app.use(express.json()); // for parsing application/json
 app.use(cors());
-
 morgan.token("content", function getContent(request) {
   //   console.log("🚀 ~ file: index.js ~ line 62 ~ getId ~ request", request.body);
 
   return JSON.stringify(request.body);
 });
-
 app.use(
   morgan(
     ":method :url :status :res[content-length] - :response-time ms :content"
   )
 );
+app.use(express.static("build"));
 
 // routes
 app.get("/", (request, response) => {
