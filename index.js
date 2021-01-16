@@ -1,60 +1,10 @@
+require("dotenv").config();
 const express = require("express");
 const morgan = require("morgan");
 const cors = require("cors");
 const app = express();
 
-let persons = [
-  {
-    name: "Arto Hellas",
-    number: "040-123456",
-    id: 1,
-  },
-  {
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-    id: 2,
-  },
-  {
-    name: "Dan Abramov",
-    number: "12-43-234345",
-    id: 3,
-  },
-  {
-    name: "Mary Poppendieck",
-    number: "39-23-6423122",
-    id: 4,
-  },
-  {
-    name: "asdfas",
-    number: "234234",
-    id: 6,
-  },
-  {
-    name: "asddfsdsf",
-    number: "23234234",
-    id: 7,
-  },
-  {
-    name: "asd",
-    number: "234234",
-    id: 10,
-  },
-  {
-    name: "aasdfsadf",
-    number: "23234",
-    id: 11,
-  },
-  {
-    name: "sadasd",
-    number: "22332443",
-    id: 12,
-  },
-  {
-    name: "asdaf",
-    number: "234234",
-    id: 13,
-  },
-];
+const Person = require("./models/person");
 
 // middlewares
 app.use(express.json()); // for parsing application/json
@@ -77,72 +27,109 @@ app.get("/", (request, response) => {
 });
 
 app.get("/api/persons", (request, response) => {
-  response.json(persons);
+  Person.find({}).then((persons) => {});
 });
 
-const generateId = () => {
-  //   const maxId = persons.length > 0 ? Math.max(...persons.map((n) => n.id)) : 0;
-  //   return maxId + 1;
+// const generateId = () => {
+//   //   const maxId = persons.length > 0 ? Math.max(...persons.map((n) => n.id)) : 0;
+//   //   return maxId + 1;
 
-  return Math.floor(Math.random() * 100000000);
-};
+//   return Math.floor(Math.random() * 100000000);
+// };
 
-app.post("/api/persons", (request, response) => {
+app.post("/api/persons", (request, response, next) => {
   const { name, number } = request.body;
 
-  if (!name || !number) {
-    return response.status(400).json({
-      error: "name or number missing",
-    });
-  }
+  // const personExist = persons.find((person) => person.name === name);
+  // if (personExist) {
+  //   return response.status(400).json({
+  //     error: "person name existed",
+  //   });
+  // }
+  // if (!name || !number) {
+  //   return response.status(400).json({
+  //     error: "name or number missing",
+  //   });
+  // }
 
-  const thePerson = persons.find((n) => n.name === name);
-
-  if (thePerson) {
-    return response.status(400).json({ error: "name must be unique" });
-  }
-
-  const person = {
-    id: generateId(),
+  const person = new Person({
     name,
     number,
-  };
+  });
 
-  persons = persons.concat(person);
-
-  response.json(person);
+  person
+    .save()
+    .then((savedPerson) => {
+      response.json(savedPerson);
+    })
+    .catch((error) => next(error));
 });
 
-app.get("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  const person = persons.find((person) => person.id === id);
-  if (person) {
-    response.json(person);
-  } else {
-    response.status(404).end();
-  }
+app.put("/api/persons/:id", (request, response, next) => {
+  const { name, number } = request.body;
+  const person = { name, number };
+
+  Person.findByIdAndUpdate(request.params.id, person, { runValidators: true })
+    .then((updatedPerson) => {
+      response.json(updatedPerson);
+    })
+    .catch((error) => next(error));
 });
 
-app.delete("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  const person = persons.find((person) => person.id === id);
-  if (person) {
-    persons = persons.filter((item) => item.id !== id);
-    response.json(`Deleted ${person.name}`);
-  } else {
-    response.status(404).end();
-  }
+app.get("/api/persons/:id", (request, response, next) => {
+  // const id = Number(request.params.id);
+  Person.findById(request.params.id)
+    .then((person) => {
+      if (person) {
+        response.json(person);
+      } else {
+        response.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
+});
+
+app.delete("/api/persons/:id", (request, response, next) => {
+  Person.findByIdAndRemove(request.params.id)
+    .then((result) => {
+      response.status(204).end();
+    })
+    .catch((error) => next(error));
 });
 
 app.get("/info", (request, response) => {
-  let content = null;
-  content = `<div>Phonebook has info for ${
-    persons.length
-  } people</div><br /><div>${new Date()}</div>`;
-  response.send(content);
+  Person.find({}).then((persons) => {
+    let content = null;
+    content = `<div>Phonebook has info for ${
+      persons.length
+    } people</div><br /><div>${new Date()}</div>`;
+    response.send(content);
+  });
 });
 
-const PORT = process.env.PORT || 3001;
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: "unknown endpoint" });
+};
+
+// handler of requests with unknown endpoint
+app.use(unknownEndpoint);
+
+const errorHandler = (error, request, response, next) => {
+  // console.error(JSON.stringify(error));
+  console.error(error.message);
+
+  if (error.name === "CastError") {
+    return response.status(400).send({ error: "malformatted id" });
+  } else if (error.name === "ValidationError") {
+    return response.status(400).json({ error: error.message });
+  }
+
+  next(error);
+};
+
+app.use(errorHandler);
+
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
@@ -150,3 +137,7 @@ app.listen(PORT, () => {
 // Exercises 3.1.-3.6.
 // Exercises 3.7.-3.8.
 // Exercises 3.9.-3.11.
+// Exercises 3.15.-3.18.
+// Exercises 3.19.-3.21.
+// 3.20*: Phonebook database, step8
+// https://gist.github.com/fgilio/230ccd514e9381fafa51608fcf137253#gistcomment-3347630

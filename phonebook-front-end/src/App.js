@@ -39,9 +39,13 @@ const App = () => {
       ) {
         return null;
       } else {
+        // Cannot read property 'ownerDocument' of null
+        // https://stackoverflow.com/a/60458500/6236633
+        const thePersonWithoutId = { ...thePerson };
+        delete thePersonWithoutId.id;
         await personsService
           .update(thePerson.id, {
-            ...thePerson,
+            ...thePersonWithoutId,
             number: newNumber,
           })
           .then((returnedPerson) => {
@@ -61,13 +65,15 @@ const App = () => {
           })
           .catch((error) => {
             setMessage({
-              content: `the person '${thePerson.name}' does not exist!`,
+              // content: `the person '${thePerson.name}' does not exist!`,
+              content: error.response.data.error,
               type: "error",
             });
             setTimeout(() => {
               setMessage(null);
             }, 5000);
-            setPersons(persons.filter((n) => n.id !== thePerson.id));
+            // if not exist
+            // setPersons(persons.filter((n) => n.id !== thePerson.id));
           });
       }
     } else {
@@ -81,6 +87,15 @@ const App = () => {
           setPersons(persons.concat([returnedPerson]));
           clearForm();
           setMessage({ content: `Added ${returnedPerson.name}`, type: "info" });
+          setTimeout(() => {
+            setMessage(null);
+          }, 5000);
+        })
+        .catch((error) => {
+          setMessage({
+            content: error.response.data.error,
+            type: "error",
+          });
           setTimeout(() => {
             setMessage(null);
           }, 5000);
